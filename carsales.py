@@ -58,8 +58,16 @@ def updatecar(id):
         conn.commit()
         conn.close()
         return redirect('/')
-    pass
     
+    
+@carsales.route('/deletecar/<int:id>')
+def deletecar(id):
+    conn = connection();
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM Barcars WHERE id = %s", (str(id)))
+    conn.commit()
+    conn.close()
+    return redirect('/')
 
 if __name__ == '__main__':
     carsales.run(debug=True)
