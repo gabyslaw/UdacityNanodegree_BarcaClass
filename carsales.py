@@ -4,14 +4,11 @@ import psycopg2
 from flask_sqlalchemy import SQLAlchemy
 
 carsales = Flask(__name__)
-carsales.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:password@localhost/vehicles'
+carsales.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres@localhost/vehicles'
 carsales.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 CORS(carsales)
 db = SQLAlchemy(carsales)
-
-
 #Models
-
 class Car(db.Model):
     __tablename__ = 'car'
     id = db.Column(db.Integer, primary_key = True)
@@ -20,9 +17,19 @@ class Car(db.Model):
     car_year = db.Column(db.Integer(), nullable = False)
     car_price = db.Column(db.Float(), nullable = False)
     car_description = db.Column(db.String(500), nullable = False)
+    car_number_plate =  db.Column(db.String(500), nullable = False, unique=True)
 
     def __repr__(self):
         return "<Car %r>" % self.car_name
+
+    def format(self):
+        return {
+            'car_name': self.car_name,
+            'car_type': self.car_type,
+            'car_year': self.car_year,
+            'car_price': self.car_price,
+            'car_description': self.car_description
+        }
 
 db.create_all()
 
@@ -35,24 +42,31 @@ def main():
 @cross_origin()
 @carsales.route('/addcar', methods=['POST'])
 def addcar():
-    car_data = request.json
+    try:
+        car_data = request.json
 
-    car_name = car_data['car_name']
-    car_type = car_data['car_type']
-    car_year= car_data['car_year']
-    car_price = car_data['car_price']
-    car_description = car_data['car_description']
+        car_name = car_data['car_name']
+        car_type = car_data['car_type']
+        car_year= car_data['car_year']
+        car_price = car_data['car_price']
+        car_description = car_data['car_description']
+        car_number_plate = car_data['number_plate']
 
-    car = Car(car_name=car_name, car_type=car_type, car_year=car_year, car_price=car_price, car_description=car_description)
-    db.session.add(car)
-    db.session.commit()
+        car = Car(car_name=car_name, car_type=car_type, car_year=car_year, car_price=car_price, car_description=car_description, car_number_plate=car_number_plate)
+        db.session.add(car)
+        db.session.commit()
 
-    #TODO: add a new column to the table (number_plate) and ensure the car data doesn't 
-    # get saved if a number plate exists in the database
-    return jsonify({
-        "success": True,
-        "response": "Car successfully added"
-    })
+        #TODO: add a new column to the table (number_plate) and ensure the car data doesn't 
+        # get saved if a number plate exists in the database
+        return jsonify({
+            "success": True,
+            "response": "Car successfully added"
+        })
+    except:
+        db.session.rollback()
+        abort(401)
+    finally:
+        db.session.close
 
 @cross_origin()
 @carsales.route('/getcar', methods=['GET'])
@@ -71,12 +85,25 @@ def getcar():
         }
         all_cars.append(result)
 
-    #TODO: Add a getcarbyid route
+    
     return jsonify({
         "success": True,
         "cars": all_cars,
         "total_cars": len(cars)
     })
+    
+#TODO: Add a getcarbyid route
+@carsales.route('/cars/<int:car_id>', methods=['DELETE'])
+def getCar(car_id):
+    try:
+        car = Car.query.get(car_id).format()
+
+        return jsonify({
+            'success': True,
+            'car': car
+            })
+    except:
+        abort(404)
 
 
 @carsales.route('/updatecar/<int:car_id>', methods=['PATCH'])
@@ -102,6 +129,22 @@ def updatecar(car_id):
     })
 
 #TODO: implement the delete route
+@carsales.route('/cars/<int:car_id>', methods=['DELETE'])
+def delete_car(car_id):
+    try:
+        car = Car.query.get(car_id)
+
+        db.session.delete(car)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'car': car.id
+            })
+    except:
+        db.session.rollback()
+    finally:
+        db.session.close()
 
 
 # def connection():
